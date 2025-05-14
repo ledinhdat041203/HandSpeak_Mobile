@@ -3,6 +3,7 @@ package com.example.handspeak.fragment
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -82,7 +83,7 @@ class CameraFragment : Fragment(), HandLandmarkerHelper.LandmarkerListener, Pose
             viewModel.setHandDelegate(handLandmarkerHelper.currentDelegate)
             viewModel.setPoseDelegate(poseLandmarkerHelper.currentDelegate)
 
-            backgroundExecutor.execute { 
+            backgroundExecutor.execute {
                 handLandmarkerHelper.clearHandLandmarker()
                 poseLandmarkerHelper.clearPoseLandmarker()
             }
@@ -329,7 +330,7 @@ class CameraFragment : Fragment(), HandLandmarkerHelper.LandmarkerListener, Pose
                 // The analyzer can then be assigned to the instance
                 .also {
                     it.setAnalyzer(backgroundExecutor) { image ->
-                        detectHand(image)
+                        detectFrame(image)
                     }
                 }
 
@@ -350,48 +351,50 @@ class CameraFragment : Fragment(), HandLandmarkerHelper.LandmarkerListener, Pose
         }
     }
 
-    fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
-        val yBuffer = imageProxy.planes[0].buffer
-        val uBuffer = imageProxy.planes[1].buffer
-        val vBuffer = imageProxy.planes[2].buffer
-
-        val ySize = yBuffer.remaining()
-        val uSize = uBuffer.remaining()
-        val vSize = vBuffer.remaining()
-
-        val nv21 = ByteArray(ySize + uSize + vSize)
-
-        yBuffer.get(nv21, 0, ySize)
-        vBuffer.get(nv21, ySize, vSize)
-        uBuffer.get(nv21, ySize + vSize, uSize)
-
-        val yuvImage = YuvImage(nv21, ImageFormat.NV21, imageProxy.width, imageProxy.height, null)
-        val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, imageProxy.width, imageProxy.height), 100, out)
-        val imageBytes = out.toByteArray()
-        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-    }
-
-
-    private fun detectHand(imageProxy: ImageProxy) {
+    private fun detectFrame(imageProxy: ImageProxy) {
         try {
-            // Run hand detection
-//            handLandmarkerHelper.detectLiveStream(
-//                imageProxy = imageProxy,
-//                isFrontCamera = cameraFacing == CameraSelector.LENS_FACING_FRONT
-//            )
-            
-            // Run pose detection with the same image
+            // Convert ImageProxy to Bitmap once
+            val bitmapBuffer = Bitmap.createBitmap(
+                imageProxy.width,
+                imageProxy.height,
+                Bitmap.Config.ARGB_8888
+            )
+            imageProxy.use { bitmapBuffer.copyPixelsFromBuffer(imageProxy.planes[0].buffer) }
+
+            val matrix = Matrix().apply {
+                // Rotate the frame received from the camera to be in the same direction as it'll be shown
+                postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+
+                // flip image if user use front camera
+                if (cameraFacing == CameraSelector.LENS_FACING_FRONT) {
+                    postScale(
+                        -1f,
+                        1f,
+                        imageProxy.width.toFloat(),
+                        imageProxy.height.toFloat()
+                    )
+                }
+            }
+            val rotatedBitmap = Bitmap.createBitmap(
+                bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
+                matrix, true
+            )
+
+            // Run hand detection with the bitmap
+            handLandmarkerHelper.detectLiveStream(
+                bitmap = rotatedBitmap,
+                isFrontCamera = cameraFacing == CameraSelector.LENS_FACING_FRONT
+            )
+
+            // Run pose detection with the same bitmap
             poseLandmarkerHelper.detectLiveStream(
-                imageProxy = imageProxy,
+                bitmap = rotatedBitmap,
                 isFrontCamera = cameraFacing == CameraSelector.LENS_FACING_FRONT
             )
         }
-
         finally {
-            // Close the image after both detections are done
-//            imageProxy.close()
-
+            // Close the original image after we're done with it
+            imageProxy.close()
         }
     }
 
@@ -410,6 +413,34 @@ class CameraFragment : Fragment(), HandLandmarkerHelper.LandmarkerListener, Pose
                 fragmentCameraBinding.bottomSheetLayout.inferenceTimeVal.text =
                     String.format("%d ms", resultBundle.inferenceTime)
 
+                val results = resultBundle.results
+
+                results.forEachIndexed { index, result ->
+                    // 1. Lấy danh sách handedness
+                    val handednessList = result.handedness()
+
+                    // 2. Lấy thông tin tay trái / tay phải
+                    handednessList.forEachIndexed { i, classifications ->
+                        val handLabel = classifications.firstOrNull()?.categoryName() ?: "Unknown"
+                        val score = classifications.firstOrNull()?.score() ?: 0f
+                        Log.d(TAG, "Hand $i is $handLabel with confidence $score")
+                    }
+
+                    // 3. Log tọa độ landmarks
+                    val handLandmarks = result.landmarks()
+                    handLandmarks.forEachIndexed { i, hand ->
+                        Log.d(TAG, "Hand $i landmarks:")
+                        hand.forEachIndexed { j, landmark ->
+                            Log.d(
+                                TAG,
+                                "Landmark $j: x=${landmark.x()}, y=${landmark.y()}, z=${landmark.z()}, visibility=${landmark.visibility()}"
+                            )
+                        }
+                    }
+                }
+
+
+
                 fragmentCameraBinding.overlay.setResults(
                     resultBundle.results.first(),
                     null,
@@ -424,6 +455,20 @@ class CameraFragment : Fragment(), HandLandmarkerHelper.LandmarkerListener, Pose
     override fun onResults(resultBundle: PoseLandmarkerHelper.ResultBundle) {
         activity?.runOnUiThread {
             if (_fragmentCameraBinding != null) {
+                // Get the first pose landmarks result
+                val poseLandmarks = resultBundle.results.firstOrNull()
+
+                // Print coordinates for each landmark
+                poseLandmarks?.let { landmarks ->
+//                    Log.d(TAG, "Found ${landmarks.landmarks().size} poses")
+                    landmarks.landmarks().forEachIndexed { poseIndex, pose ->
+//                        Log.d(TAG, "Pose $poseIndex landmarks:")
+                        pose.forEachIndexed { index, landmark ->
+//                            Log.d(TAG, "Pose Landmark $index: x=${landmark.x()}, y=${landmark.y()}, z=${landmark.z()}, visibility=${landmark.visibility()}")
+                        }
+                    }
+                }
+
                 fragmentCameraBinding.overlay.setResults(
                     null,
                     resultBundle.results.first(),

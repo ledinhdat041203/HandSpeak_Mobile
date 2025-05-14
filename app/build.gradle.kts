@@ -78,7 +78,7 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
-
+    implementation("androidx.camera:camera-extensions:$cameraxVersion")
     // WindowManager
     implementation("androidx.window:window:1.2.0")
 
