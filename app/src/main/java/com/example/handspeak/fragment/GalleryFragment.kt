@@ -327,7 +327,7 @@ class GalleryFragment : Fragment(), HandLandmarkerHelper.LandmarkerListener, Pos
 
         with(fragmentGalleryBinding.videoView) {
             setVideoURI(uri)
-            // mute the audio
+            // mute the audio--
             setOnPreparedListener { it.setVolume(0f, 0f) }
             requestFocus()
         }
