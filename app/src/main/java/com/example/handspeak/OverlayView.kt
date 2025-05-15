@@ -88,8 +88,8 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 // Draw points
                 for (normalizedLandmark in landmark) {
                     canvas.drawPoint(
-                        normalizedLandmark.x() * imageWidth * scaleFactor,
-                        normalizedLandmark.y() * imageHeight * scaleFactor,
+                        normalizedLandmark.x() * width,
+                        normalizedLandmark.y() * height,
                         handPointPaint
                     )
                 }
@@ -97,10 +97,10 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 // Draw connections
                 HandLandmarker.HAND_CONNECTIONS.forEach {
                     canvas.drawLine(
-                        landmark.get(it!!.start()).x() * imageWidth * scaleFactor,
-                        landmark.get(it.start()).y() * imageHeight * scaleFactor,
-                        landmark.get(it.end()).x() * imageWidth * scaleFactor,
-                        landmark.get(it.end()).y() * imageHeight * scaleFactor,
+                        landmark.get(it!!.start()).x() * width,
+                        landmark.get(it.start()).y() * height,
+                        landmark.get(it.end()).x() * width,
+                        landmark.get(it.end()).y() * height,
                         handLinePaint
                     )
                 }
@@ -113,8 +113,8 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 // Draw points
                 for (normalizedLandmark in landmark) {
                     canvas.drawPoint(
-                        normalizedLandmark.x() * imageWidth * scaleFactor,
-                        normalizedLandmark.y() * imageHeight * scaleFactor,
+                        normalizedLandmark.x() * width,
+                        normalizedLandmark.y() * height,
                         posePointPaint
                     )
                 }
@@ -122,10 +122,10 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 // Draw connections
                 PoseLandmarker.POSE_LANDMARKS.forEach {
                     canvas.drawLine(
-                        landmark.get(it!!.start()).x() * imageWidth * scaleFactor,
-                        landmark.get(it.start()).y() * imageHeight * scaleFactor,
-                        landmark.get(it.end()).x() * imageWidth * scaleFactor,
-                        landmark.get(it.end()).y() * imageHeight * scaleFactor,
+                        landmark.get(it!!.start()).x() * width,
+                        landmark.get(it.start()).y() * height,
+                        landmark.get(it.end()).x() * width,
+                        landmark.get(it.end()).y() * height,
                         poseLinePaint
                     )
                 }
